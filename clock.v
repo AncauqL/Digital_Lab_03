@@ -1,64 +1,6 @@
 `timescale 1ns / 1ps
 
-module clock(
-    input clk,
-    input rst,
 
-    output [6:0] seg,
-    output [7:0] an,
-    output reg colon 
-    );
-
-    wire tick_1Hz;
-    wire tick_1kHz;
-
-    wire [3:0] sec_0;
-    wire [3:0] sec_1;
-    wire [3:0] min_0;
-    wire [3:0] min_1;
-    wire [3:0] hour_0;
-    wire [3:0] hour_1;
-
-    clk_div_1Hz u_clk_div_1Hz(
-        .clk(clk),
-        .rst(rst),
-        .tick_1Hz(tick_1Hz)
-    );
-
-    clk_div_1kHz u_clk_div_1kHz(
-        .clk(clk),
-        .rst(rst),
-        .tick_1kHz(tick_1kHz)
-    );
-
-    time_counter u_time_counter(
-        .clk(clk),
-        .rst(rst),
-        .tick_1Hz(tick_1Hz),
-        .sec_0(sec_0),
-        .sec_1(sec_1),
-        .min_0(min_0),
-        .min_1(min_1),
-        .hour_0(hour_0),
-        .hour_1(hour_1)
-    );
-
-    digit_display u_digit_display(
-        .clk(clk),
-        .rst(rst),
-        .tick_1kHz(tick_1kHz),   
-        .sec_0(sec_0),
-        .sec_1(sec_1),
-        .min_0(min_0),
-        .min_1(min_1),
-        .hour_0(hour_0),
-        .hour_1(hour_1),
-        .an(an),
-        .seg(seg),
-        .colon(colon)     
-    );
-
-endmodule
 
 //将数字0-9转化为七段码
 module seg_decoder(
@@ -95,7 +37,7 @@ module clk_div_1Hz(
             tick_1Hz <= 0;
         end
         else begin
-            if(count == 27'99_999_999)begin//时钟走过100M-1时,tick_1Hz变为1一次,得到1Hz的分频,T = 1s
+            if(count == 27'd99_999_999)begin//时钟走过100M-1时,tick_1Hz变为1一次,得到1Hz的分频,T = 1s
                 count <= 0;
                 tick_1Hz <= 1;
             end
@@ -134,15 +76,15 @@ endmodule
 
 //实现时钟计数逻辑,先实现 模X计数器, 再套到时分秒的各位上
 module digit_counter #(
-    parameter MAX = 9 ;//自定义参数,也就是计数器的模数
+    parameter MAX = 9 //自定义参数,也就是计数器的模数
 )(
     input clk,
     input rst,
     input en, //设置使能端,用于级联
     output carry, //进位输出
     output reg [3:0] q //计数
-)
-    assign carry = en && (q == MAX) //q达到MAX且使能端有效时,输出进位
+);
+    assign carry = en && (q == MAX); //q达到MAX且使能端有效时,输出进位
 
     always @(posedge clk)begin
         if(rst)begin
@@ -254,7 +196,7 @@ module time_counter(
         .rst(rst),
         .en(carry_min_1),
         .hour_0(hour_0),
-        .hour_1(hour_1)
+        .hour_1(hour_1),
         .carry(carry_hour)
     );
 
@@ -274,8 +216,8 @@ module digit_display(
     input [3:0] hour_1,
 
     output reg [7:0] an,//决定哪一位数码管被点亮,一共八位
-    output reg [6:0] seg,//决定一个数码管的哪几段被点亮,一共七段
-    output colon //冒号
+    output  [6:0] seg,//决定一个数码管的哪几段被点亮,一共七段
+    output reg colon //冒号
 );
 
     //以1kHz的频率对用到的六位数码管进行扫描
@@ -339,5 +281,68 @@ module digit_display(
     );
 
 
+
+endmodule
+        
+        
+        
+        
+module clock(
+    input clk,
+    input rst,
+
+    output [6:0] seg,
+    output [7:0] an,
+    output  colon 
+    );
+
+    wire tick_1Hz;
+    wire tick_1kHz;
+
+    wire [3:0] sec_0;
+    wire [3:0] sec_1;
+    wire [3:0] min_0;
+    wire [3:0] min_1;
+    wire [3:0] hour_0;
+    wire [3:0] hour_1;
+
+    clk_div_1Hz u_clk_div_1Hz(
+        .clk(clk),
+        .rst(rst),
+        .tick_1Hz(tick_1Hz)
+    );
+
+    clk_div_1kHz u_clk_div_1kHz(
+        .clk(clk),
+        .rst(rst),
+        .tick_1kHz(tick_1kHz)
+    );
+
+    time_counter u_time_counter(
+        .clk(clk),
+        .rst(rst),
+        .tick_1Hz(tick_1Hz),
+        .sec_0(sec_0),
+        .sec_1(sec_1),
+        .min_0(min_0),
+        .min_1(min_1),
+        .hour_0(hour_0),
+        .hour_1(hour_1)
+    );
+
+    digit_display u_digit_display(
+        .clk(clk),
+        .rst(rst),
+        .tick_1kHz(tick_1kHz),   
+        .sec_0(sec_0),
+        .sec_1(sec_1),
+        .min_0(min_0),
+        .min_1(min_1),
+        .hour_0(hour_0),
+        .hour_1(hour_1),
+        .an(an),
+        .seg(seg),
+        .colon(colon)     
+    );
 
 endmodule
