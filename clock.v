@@ -1,7 +1,5 @@
 `timescale 1ns / 1ps
 
-
-
 //将数字0-9转化为七段码
 module seg_decoder(
     input [3:0] num,//输入用8421BCD码表示
@@ -217,7 +215,7 @@ module digit_display(
 
     output reg [7:0] an,//决定哪一位数码管被点亮,一共八位
     output  [6:0] seg,//决定一个数码管的哪几段被点亮,一共七段
-    output reg colon //冒号
+    output reg colon //冒号(看手册发现板子没有冒号的引脚,用小数点代替)
 );
 
     //以1kHz的频率对用到的六位数码管进行扫描
@@ -280,13 +278,19 @@ module digit_display(
         .seg(seg)
     );
 
-
-
 endmodule
-        
-        
-        
-        
+
+module set_time()
+endmodule
+
+module hourly_chime()
+endmodule
+
+module alarm()
+endmodule
+
+
+
 module clock(
     input clk,
     input rst,
@@ -306,12 +310,14 @@ module clock(
     wire [3:0] hour_0;
     wire [3:0] hour_1;
 
+    //获得1Hz的分频
     clk_div_1Hz u_clk_div_1Hz(
         .clk(clk),
         .rst(rst),
         .tick_1Hz(tick_1Hz)
     );
 
+    //获得1kHz的分频
     clk_div_1kHz u_clk_div_1kHz(
         .clk(clk),
         .rst(rst),
