@@ -108,7 +108,7 @@
 \pagestyle{fancy}
 \fancyhead[L]{}%%留空则不显示
 \fancyhead[C]{\fangsong 数字逻辑实验课程报告}%%留空则不显示
-\fancyhead[R]{}%%留空则不显示
+\fancyhead[R]{20241034111 李金诺}%%留空则不显示
 
 
 %封面页设置
@@ -162,13 +162,15 @@
 \newtcblisting{codeblock}[1]{
     enhanced,                % 必须有 skins 库才能用 enhanced
     breakable,
-    colback=white,
-    colframe=black,
-    arc=0pt,
-    boxrule=0.5pt,
+    colback=gray!3,
+    colframe=black!45,
+    arc=1pt,
+    boxrule=0.35pt,
     listing only,
-    left = 22pt,
-    right = 5pt,
+    left = 14pt,
+    right = 3pt,
+    top = 2pt,
+    bottom = 2pt,
     % 设置跨页封口
     overlay broken={
         \draw[black, thin] (frame.south west) -- (frame.south east);
@@ -176,13 +178,49 @@
     },
     listing options={
         language=#1,
-        basicstyle=\ttfamily\small,
-        columns=flexible,
+        basicstyle=\ttfamily\scriptsize,
+        columns=fullflexible,
         numbers=left,
         numberstyle=\tiny\color{gray},
+        numbersep=5pt,
         breaklines=true,
         keywordstyle=\color{blue},
         commentstyle=\color{gray},
         keepspaces=true,
+        showstringspaces=false,
+        tabsize=4,
     }
+}
+
+\newtcbinputlisting{\inputverilog}[5][]{
+    enhanced,
+    breakable,
+    listing only,
+    title={#2},
+    listing file={#3},
+    colback=gray!3,
+    colframe=black!45,
+    boxrule=0.35pt,
+    arc=1pt,
+    left=10pt,
+    right=3pt,
+    top=2pt,
+    bottom=2pt,
+    fonttitle=\bfseries\small,
+    listing options={
+        language=Verilog,
+        basicstyle=\ttfamily\scriptsize,
+        columns=fullflexible,
+        numbers=left,
+        numberstyle=\tiny\color{gray},
+        numbersep=5pt,
+        breaklines=true,
+        keepspaces=true,
+        showstringspaces=false,
+        tabsize=4,
+        firstline=#4,
+        lastline=#5,
+        firstnumber=#4
+    },
+    #1
 }
