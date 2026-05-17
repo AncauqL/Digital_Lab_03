@@ -579,6 +579,167 @@ module hour_chime(
 endmodule
 
 
+//闹钟模块
+module alarm_ctrl(
+    input clk,
+    input rst,
+    input alarm_sw,
+    input time_set_mode,
+
+    input [2:0] set_sel,
+    input inc_pulse,
+    input dec_pulse,
+
+    input [3:0] cur_sec_0,
+    input [3:0] cur_sec_1,
+    input [3:0] cur_min_0,
+    input [3:0] cur_min_1,
+    input [3:0] cur_hour_0,
+    input [3:0] cur_hour_1,
+
+    output reg [3:0] alarm_sec_0,
+    output reg [3:0] alarm_sec_1,
+    output reg [3:0] alarm_min_0,
+    output reg [3:0] alarm_min_1,
+    output reg [3:0] alarm_hour_0,
+    output reg [3:0] alarm_hour_1,
+
+    output reg alarm_valid,
+    output reg alarm_led
+);
+
+    reg alarm_sw_d;
+    reg match_d;
+    reg ringing;
+    reg [28:0] ring_cnt;
+    reg [24:0] blink_cnt;
+
+    wire alarm_enter = alarm_sw && !alarm_sw_d;
+    wire alarm_exit  = !alarm_sw && alarm_sw_d;
+
+    wire alarm_match =
+        alarm_valid &&
+        !alarm_sw &&
+        !time_set_mode &&
+        cur_sec_0  == alarm_sec_0  &&
+        cur_sec_1  == alarm_sec_1  &&
+        cur_min_0  == alarm_min_0  &&
+        cur_min_1  == alarm_min_1  &&
+        cur_hour_0 == alarm_hour_0 &&
+        cur_hour_1 == alarm_hour_1;
+
+    always @(posedge clk) begin
+        if (rst) begin
+            alarm_sw_d <= 1'b0;
+            alarm_valid <= 1'b0;
+
+            alarm_sec_0 <= 4'd0;
+            alarm_sec_1 <= 4'd0;
+            alarm_min_0 <= 4'd0;
+            alarm_min_1 <= 4'd0;
+            alarm_hour_0 <= 4'd0;
+            alarm_hour_1 <= 4'd0;
+        end else begin
+            alarm_sw_d <= alarm_sw;
+
+            if (alarm_enter) begin
+                alarm_valid <= 1'b0;
+
+                alarm_sec_0 <= cur_sec_0;
+                alarm_sec_1 <= cur_sec_1;
+                alarm_min_0 <= cur_min_0;
+                alarm_min_1 <= cur_min_1;
+                alarm_hour_0 <= cur_hour_0;
+                alarm_hour_1 <= cur_hour_1;
+            end else if (alarm_exit) begin
+                alarm_valid <= 1'b1;
+            end else if (alarm_sw) begin
+                if (inc_pulse) begin
+                    case (set_sel)
+                        3'd0: alarm_sec_0 <= (alarm_sec_0 == 4'd9) ? 4'd0 : alarm_sec_0 + 1'b1;
+                        3'd1: alarm_sec_1 <= (alarm_sec_1 == 4'd5) ? 4'd0 : alarm_sec_1 + 1'b1;
+                        3'd2: alarm_min_0 <= (alarm_min_0 == 4'd9) ? 4'd0 : alarm_min_0 + 1'b1;
+                        3'd3: alarm_min_1 <= (alarm_min_1 == 4'd5) ? 4'd0 : alarm_min_1 + 1'b1;
+
+                        3'd4: begin
+                            if (alarm_hour_1 == 4'd2)
+                                alarm_hour_0 <= (alarm_hour_0 == 4'd3) ? 4'd0 : alarm_hour_0 + 1'b1;
+                            else
+                                alarm_hour_0 <= (alarm_hour_0 == 4'd9) ? 4'd0 : alarm_hour_0 + 1'b1;
+                        end
+
+                        3'd5: begin
+                            alarm_hour_1 <= (alarm_hour_1 == 4'd2) ? 4'd0 : alarm_hour_1 + 1'b1;
+
+                            if (alarm_hour_1 == 4'd1 && alarm_hour_0 > 4'd3)
+                                alarm_hour_0 <= 4'd3;
+                        end
+                    endcase
+                end else if (dec_pulse) begin
+                    case (set_sel)
+                        3'd0: alarm_sec_0 <= (alarm_sec_0 == 4'd0) ? 4'd9 : alarm_sec_0 - 1'b1;
+                        3'd1: alarm_sec_1 <= (alarm_sec_1 == 4'd0) ? 4'd5 : alarm_sec_1 - 1'b1;
+                        3'd2: alarm_min_0 <= (alarm_min_0 == 4'd0) ? 4'd9 : alarm_min_0 - 1'b1;
+                        3'd3: alarm_min_1 <= (alarm_min_1 == 4'd0) ? 4'd5 : alarm_min_1 - 1'b1;
+
+                        3'd4: begin
+                            if (alarm_hour_0 == 4'd0)
+                                alarm_hour_0 <= (alarm_hour_1 == 4'd2) ? 4'd3 : 4'd9;
+                            else
+                                alarm_hour_0 <= alarm_hour_0 - 1'b1;
+                        end
+
+                        3'd5: begin
+                            alarm_hour_1 <= (alarm_hour_1 == 4'd0) ? 4'd2 : alarm_hour_1 - 1'b1;
+
+                            if (alarm_hour_1 == 4'd0 && alarm_hour_0 > 4'd3)
+                                alarm_hour_0 <= 4'd3;
+                        end
+                    endcase
+                end
+            end
+        end
+    end
+
+    always @(posedge clk) begin
+        if (rst || alarm_sw || time_set_mode) begin
+            match_d <= 1'b0;
+            ringing <= 1'b0;
+            ring_cnt <= 29'd0;
+            blink_cnt <= 25'd0;
+            alarm_led <= 1'b0;
+        end else begin
+            match_d <= alarm_match;
+
+            if (alarm_match && !match_d && !ringing) begin
+                ringing <= 1'b1;
+                ring_cnt <= 29'd499_999_999;   // 100MHz 下约 5s
+                blink_cnt <= 25'd0;
+                alarm_led <= 1'b1;
+            end else if (ringing) begin
+                if (ring_cnt == 29'd0) begin
+                    ringing <= 1'b0;
+                    alarm_led <= 1'b0;
+                    blink_cnt <= 25'd0;
+                end else begin
+                    ring_cnt <= ring_cnt - 1'b1;
+
+                    if (blink_cnt == 25'd24_999_999) begin
+                        blink_cnt <= 25'd0;
+                        alarm_led <= ~alarm_led;
+                    end else begin
+                        blink_cnt <= blink_cnt + 1'b1;
+                    end
+                end
+            end else begin
+                alarm_led <= 1'b0;
+            end
+        end
+    end
+
+endmodule
+
+
 module clock(
     input clk,
     input rst,
@@ -589,12 +750,15 @@ module clock(
     input btn_inc,//increase
     input btn_dec,//decrease
 
+    //闹钟
+    input alarm_sw,
 
     output [6:0] seg,
     output [7:0] an,
     output  colon, 
     output [5:0] settime,
-    output alarm
+    output alarm, //整点报时用的led
+    output alarm_led //闹钟响铃用的led 
     );
 
     wire tick_1Hz;
@@ -629,7 +793,32 @@ module clock(
     assign settime[1] = set_mode && (set_sel == 3'd1); // sec_1
     assign settime[0] = set_mode && (set_sel == 3'd0); // sec_0
 
+    //闹钟
+    wire time_set_mode;
+    wire alarm_valid;
 
+    wire [3:0] alarm_sec_0;
+    wire [3:0] alarm_sec_1;
+    wire [3:0] alarm_min_0;
+    wire [3:0] alarm_min_1;
+    wire [3:0] alarm_hour_0;
+    wire [3:0] alarm_hour_1;
+
+    wire [3:0] disp_sec_0;
+    wire [3:0] disp_sec_1;
+    wire [3:0] disp_min_0;
+    wire [3:0] disp_min_1;
+    wire [3:0] disp_hour_0;
+    wire [3:0] disp_hour_1;
+
+    assign time_set_mode = set_sw && !alarm_sw; // alarm_sw 优先
+
+    assign disp_sec_0  = alarm_sw ? alarm_sec_0  : sec_0;
+    assign disp_sec_1  = alarm_sw ? alarm_sec_1  : sec_1;
+    assign disp_min_0  = alarm_sw ? alarm_min_0  : min_0;
+    assign disp_min_1  = alarm_sw ? alarm_min_1  : min_1;
+    assign disp_hour_0 = alarm_sw ? alarm_hour_0 : hour_0;
+    assign disp_hour_1 = alarm_sw ? alarm_hour_1 : hour_1;
 
 
 
@@ -653,7 +842,7 @@ module clock(
     .rst(rst),
     .tick_1Hz(tick_1Hz),
 
-    .set_mode(set_mode),
+    .set_mode(time_set_mode),
     .set_sel(set_sel),
     .inc_pulse(inc_pulse),
     .dec_pulse(dec_pulse),
@@ -673,12 +862,12 @@ module clock(
         .clk(clk),
         .rst(rst),
         .tick_1kHz(tick_1kHz),   
-        .sec_0(sec_0),
-        .sec_1(sec_1),
-        .min_0(min_0),
-        .min_1(min_1),
-        .hour_0(hour_0),
-        .hour_1(hour_1),
+        .sec_0(disp_sec_0),
+        .sec_1(disp_sec_1),
+        .min_0(disp_min_0),
+        .min_1(disp_min_1),
+        .hour_0(disp_hour_0),
+        .hour_1(disp_hour_1),//显示的数字可能是真实时间,也可能是闹钟时间
         .an(an),
         .seg(seg),
         .colon(colon)     
@@ -688,7 +877,7 @@ module clock(
     set_time u_set_time(
         .clk(clk),
         .rst(rst),
-        .set_sw(set_sw),
+        .set_sw(set_sw || alarm_sw),//兼容闹钟模式下的调时间
 
         // .btn_left_pulse(btn_left),
         // .btn_right_pulse(btn_right),
@@ -743,6 +932,35 @@ module clock(
         .set_mode(set_mode),
         .hour_tick(hour_tick),
         .alarm(alarm)
+);
+
+//闹钟
+    alarm_ctrl u_alarm_ctrl(
+    .clk(clk),
+    .rst(rst),
+    .alarm_sw(alarm_sw),
+    .time_set_mode(time_set_mode),
+
+    .set_sel(set_sel),
+    .inc_pulse(inc_pulse),
+    .dec_pulse(dec_pulse),
+
+    .cur_sec_0(sec_0),
+    .cur_sec_1(sec_1),
+    .cur_min_0(min_0),
+    .cur_min_1(min_1),
+    .cur_hour_0(hour_0),
+    .cur_hour_1(hour_1),
+
+    .alarm_sec_0(alarm_sec_0),
+    .alarm_sec_1(alarm_sec_1),
+    .alarm_min_0(alarm_min_0),
+    .alarm_min_1(alarm_min_1),
+    .alarm_hour_0(alarm_hour_0),
+    .alarm_hour_1(alarm_hour_1),
+
+    .alarm_valid(alarm_valid),
+    .alarm_led(alarm_led)
 );
 
 
