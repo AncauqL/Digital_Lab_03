@@ -273,7 +273,9 @@ module time_counter(
     output [3:0] min_0, 
     output [3:0] min_1, 
     output [3:0] hour_0,
-    output [3:0] hour_1
+    output [3:0] hour_1,
+    //用于整点报时的输出端口
+    output hour_tick
     );
 
     //分别定义来自各个位的进位
@@ -282,6 +284,10 @@ module time_counter(
     wire carry_min_0;
     wire carry_min_1;
     wire carry_hour;
+
+    //用于整点报时
+    assign hour_tick = (!set_mode) && carry_min_1;
+
 
     //实例化各计数模块,每1秒更新一次sec_0,依次累加即可计时
     digit_counter #(.MAX(9)) u_sec_0(
@@ -525,9 +531,52 @@ module button_debounce_pulse #(
     end
 
 endmodule
+module hour_chime(
+    input clk,
+    input rst,
+    input set_mode,
+    input hour_tick,
 
+    output reg alarm 
+);
 
+    reg active;
+    reg [26:0] duration_cnt; // 100MHz 下 1 秒需要 100_000_000 个周期
+    reg [15:0] tone_cnt;     // 2kHz 方波半周期：100M / 2 / 2000 = 25000
 
+    always @(posedge clk) begin
+        if (rst || set_mode) begin
+            active <= 1'b0;
+            duration_cnt <= 27'd0;
+            tone_cnt <= 16'd0;
+            alarm <= 1'b0;
+        end else begin
+            if (hour_tick) begin
+                active <= 1'b1;
+                duration_cnt <= 27'd99_999_999;
+                tone_cnt <= 16'd0;
+                alarm <= 1'b0;
+            end else if (active) begin
+                if (duration_cnt == 27'd0) begin
+                    active <= 1'b0;
+                    alarm <= 1'b0;
+                end else begin
+                    duration_cnt <= duration_cnt - 1'b1;
+
+                    if (tone_cnt == 16'd24_999) begin
+                        tone_cnt <= 16'd0;
+                        alarm <= ~alarm;
+                    end else begin
+                        tone_cnt <= tone_cnt + 1'b1;
+                    end
+                end
+            end else begin
+                alarm <= 1'b0;
+            end
+        end
+    end
+
+endmodule
 
 
 module clock(
@@ -544,7 +593,8 @@ module clock(
     output [6:0] seg,
     output [7:0] an,
     output  colon, 
-    output [5:0] settime
+    output [5:0] settime,
+    output alarm
     );
 
     wire tick_1Hz;
@@ -568,6 +618,9 @@ module clock(
     wire btn_right_p;
     wire btn_inc_p;
     wire btn_dec_p;
+
+    //hour chime
+    wire hour_tick;
 
     assign settime[5] = set_mode && (set_sel == 3'd5); // hour_1
     assign settime[4] = set_mode && (set_sel == 3'd4); // hour_0
@@ -604,6 +657,7 @@ module clock(
     .set_sel(set_sel),
     .inc_pulse(inc_pulse),
     .dec_pulse(dec_pulse),
+    .hour_tick(hour_tick),
 
     .sec_0(sec_0),
     .sec_1(sec_1),
@@ -681,6 +735,16 @@ module clock(
     .btn(btn_dec),
     .pulse(btn_dec_p)
 );
+
+//hour chime
+    hour_chime u_hour_chime(
+        .clk(clk),
+        .rst(rst),
+        .set_mode(set_mode),
+        .hour_tick(hour_tick),
+        .alarm(alarm)
+);
+
 
 
 endmodule
