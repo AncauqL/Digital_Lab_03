@@ -1,0 +1,85 @@
+\documentclass[tikz,border=8pt]{standalone}
+\usepackage{ctex}
+\usetikzlibrary{arrows.meta,positioning}
+
+\begin{document}
+\begin{tikzpicture}[
+    font=\small,
+    >=Stealth,
+    block/.style={
+        draw,
+        rounded corners=2pt,
+        align=center,
+        minimum width=30mm,
+        minimum height=10mm,
+        fill=blue!5
+    },
+    input/.style={
+        draw,
+        rounded corners=2pt,
+        align=center,
+        minimum width=28mm,
+        minimum height=10mm,
+        fill=gray!8
+    },
+    output/.style={
+        draw,
+        rounded corners=2pt,
+        align=center,
+        minimum width=27mm,
+        minimum height=10mm,
+        fill=green!8
+    },
+    line/.style={->,thick},
+    ctrl/.style={->,thick,dashed}
+]
+
+% 主计时与显示通路
+\node[input] (clk) {100 MHz 时钟\\复位};
+\node[block, right=12mm of clk] (div) {时钟分频\\1 Hz / 1 kHz};
+\node[block, right=15mm of div] (counter) {时间计数\\HH:MM:SS};
+\node[block, right=16mm of counter] (mux) {显示数据选择\\当前时间 / 闹钟时间};
+\node[block, right=15mm of mux] (display) {动态扫描显示\\位选 + 七段译码};
+\node[output, right=12mm of display] (seg) {数码管输出\\seg / an / dp};
+
+% 设置与闹钟控制通路
+\node[input, below=18mm of clk] (keys) {按键与开关\\校时 / 闹钟};
+\node[block, right=12mm of keys] (debounce) {按键消抖\\单脉冲};
+\node[block, right=15mm of debounce] (settime) {设置控制\\模式 + 位选择};
+\node[block, right=16mm of settime] (alarmctrl) {闹钟控制\\设置 / 匹配 / 闪烁};
+\node[output, right=15mm of alarmctrl] (alarmled) {闹钟指示\\alarm\_led};
+
+% 整点报时
+\node[block, above=14mm of mux] (chime) {整点报时\\小时进位触发};
+\node[output, right=15mm of chime] (alarm) {报时输出\\alarm};
+
+% 辅助输出
+\node[output, below=14mm of settime] (setled) {选中位指示\\settime};
+
+% 主箭头
+\draw[line] (clk) -- (div);
+\draw[line] (div) -- node[above] {1 Hz} (counter);
+\draw[line] (counter) -- node[above] {当前时间} (mux);
+\draw[line] (mux) -- (display);
+\draw[line] (display) -- (seg);
+
+% 控制箭头
+\draw[line] (keys) -- (debounce);
+\draw[line] (debounce) -- (settime);
+\draw[ctrl] (settime.north) -- node[right] {校时} (counter.south);
+\draw[line] (settime) -- (alarmctrl);
+\draw[line] (settime) -- (setled);
+
+% 闹钟与显示选择
+\draw[line] (counter.south) -- node[left] {当前时间} (alarmctrl.north);
+\draw[line] (alarmctrl.north east) to[out=55,in=-120] node[right] {闹钟时间} (mux.south);
+\draw[line] (alarmctrl) -- (alarmled);
+\draw[ctrl] (keys.north east) to[out=35,in=-145] node[below] {闹钟设置开关} (mux.south west);
+
+% 扫描与报时
+\draw[ctrl] (div.north east) to[out=35,in=150] node[above] {1 kHz} (display.north west);
+\draw[line] (counter.north) -- node[left] {小时进位} (chime.south);
+\draw[line] (chime) -- (alarm);
+
+\end{tikzpicture}
+\end{document}
